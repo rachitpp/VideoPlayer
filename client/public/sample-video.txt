@@ -1,0 +1,7 @@
+In a real application, you would place a sample video file here, such as "sample-video.mp4".
+
+For this demo, we're using an external video source.
+
+To use your own video:
+1. Place your video file in this "public" directory
+2. Update the DEMO_VIDEO_URL in VideoPlayer.jsx to "/your-video-file.mp4" 
