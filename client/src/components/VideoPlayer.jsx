@@ -13,7 +13,7 @@ function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
   const {
     loading,
     error,
-    progressPercentage,
+    progressPercentage: rawProgressPercentage,
     watchedIntervals,
     lastWatchedTime,
     totalDuration,
@@ -23,6 +23,22 @@ function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
     handlePause,
     syncWithServer,
   } = useVideoProgress(userId, videoId);
+
+  // Add a safeguard against NaN progress values
+  const [safeProgressPercentage, setSafeProgressPercentage] = useState(0);
+
+  // Update the safe progress value whenever progressPercentage changes
+  useEffect(() => {
+    // Only update if the new value is valid and greater than current
+    if (!isNaN(rawProgressPercentage) && rawProgressPercentage > 0) {
+      setSafeProgressPercentage((prev) =>
+        Math.max(prev, rawProgressPercentage)
+      );
+      console.log(`Updated safe progress to: ${rawProgressPercentage}%`);
+    } else {
+      console.log(`Ignoring invalid progress value: ${rawProgressPercentage}`);
+    }
+  }, [rawProgressPercentage]);
 
   // Format time (seconds) to MM:SS
   const formatTime = (seconds) => {
@@ -115,9 +131,8 @@ function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
     <div className="video-player-container">
       {error && <div className="error-message">{error}</div>}
 
-      <div className="video-header">
+      <div className="video-tracker-header">
         <h2>Video Progress Tracker</h2>
-        <div className="video-badge">Interactive Player</div>
       </div>
 
       <div className="main-content-layout">
@@ -138,21 +153,24 @@ function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
 
           <div className="video-controls">
             <div className="controls-row">
-              <button className="play-button" onClick={togglePlay}>
-                <span className={isPlaying ? "pause-icon" : "play-icon"}></span>
-              </button>
+              <button
+                className={`play-button ${isPlaying ? "pause" : "play"}`}
+                onClick={togglePlay}
+              ></button>
 
               <div className="progress-container">
                 <div className="progress-bar-container">
                   <div
                     className="progress-bar"
-                    style={{ width: `${progressPercentage}%` }}
+                    style={{
+                      width: `${safeProgressPercentage}%`,
+                    }}
                   />
                 </div>
 
                 <div className="progress-info">
                   <span>{formatTime(currentTime)}</span>
-                  <span>Watched: {progressPercentage.toFixed(2)}%</span>
+                  <span>Watched: {safeProgressPercentage.toFixed(2)}%</span>
                   <span>{formatTime(videoDuration)}</span>
                 </div>
               </div>
@@ -163,7 +181,7 @@ function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
         <div className="debug-content">
           <div className="debug-controls">
             <button onClick={toggleDebug} className="debug-button">
-              {debug ? "Hide Debug Info" : "Show Debug Info"}
+              {debug ? "Hide Video Info" : "Video Info"}
             </button>
           </div>
 
@@ -191,7 +209,7 @@ function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
               <p>
                 Progress:{" "}
                 <span className="percentage-value">
-                  {progressPercentage.toFixed(2)}%
+                  {safeProgressPercentage.toFixed(2)}%
                 </span>
               </p>
               <p>
@@ -245,18 +263,12 @@ function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
               </ul>
             </div>
           ) : (
-            <div className="debug-placeholder">
-              <div>
-                <p>
-                  Click "Show Debug Info" to view detailed information about
-                  your watching progress
-                </p>
-                <p>
-                  Total watched:{" "}
-                  <span className="percentage-value">
-                    {progressPercentage.toFixed(2)}%
-                  </span>
-                </p>
+            <div className="debug-info-container">
+              <div className="total-watched">
+                Total watched:{" "}
+                <span className="percentage">
+                  {safeProgressPercentage.toFixed(2)}%
+                </span>
               </div>
             </div>
           )}

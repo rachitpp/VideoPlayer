@@ -266,30 +266,59 @@ export default function useVideoProgress(userId, videoId) {
       const merged = mergeIntervals(newIntervals);
       console.log("Merged intervals after save:", merged);
 
-      // Update progress percentage locally
+      // Calculate new progress percentage
+      let newProgress = 0;
       if (totalDuration > 0) {
-        const newProgress = calculateProgress(merged, totalDuration);
+        newProgress = calculateProgress(merged, totalDuration);
         console.log(
-          `Calculated progress: ${newProgress}% (${merged.length} intervals, duration: ${totalDuration}s)`
+          `New progress calculation: ${newProgress}% (${merged.length} intervals, duration: ${totalDuration}s)`
         );
+      }
 
-        // Never let progress go backwards
-        const finalProgress = Math.max(
-          newProgress,
-          progressPercentage,
+      // Ensure progress is a valid number
+      const validProgress = isNaN(newProgress)
+        ? isNaN(progressPercentage)
+          ? 0
+          : progressPercentage
+        : newProgress;
+
+      // Store the current progress for comparison
+      const currentProgress = isNaN(progressPercentage)
+        ? 0
+        : progressPercentage;
+
+      console.log(
+        `Comparing progress: current=${currentProgress}, new=${validProgress}`
+      );
+
+      // Only update progress if the new value is higher (never decrease progress)
+      if (
+        validProgress > currentProgress ||
+        validProgress > highestProgressRef.current
+      ) {
+        highestProgressRef.current = Math.max(
+          validProgress,
           highestProgressRef.current
         );
-        highestProgressRef.current = finalProgress;
-        setProgressPercentage(finalProgress);
-
-        // Save to local storage
-        saveLocalProgress({
-          watchedIntervals: merged,
-          progress: finalProgress,
-          lastWatchedTime: currentTimeRef.current,
-          totalDuration,
-        });
+        setProgressPercentage(validProgress);
+        console.log(`Progress updated to ${validProgress}%`);
+      } else {
+        console.log(`Keeping current progress at ${currentProgress}%`);
       }
+
+      // Save to local storage with the highest progress
+      const finalProgress = Math.max(
+        validProgress,
+        currentProgress,
+        highestProgressRef.current
+      );
+
+      saveLocalProgress({
+        watchedIntervals: merged,
+        progress: finalProgress,
+        lastWatchedTime: currentTimeRef.current,
+        totalDuration,
+      });
 
       return merged;
     });
@@ -323,6 +352,10 @@ export default function useVideoProgress(userId, videoId) {
           currentIntervalRef.current
         );
         saveInterval({ ...currentIntervalRef.current });
+
+        // When pausing, keep the current interval data until next play
+        // but mark it as inactive by clearing the watched seconds
+        watchedSecondsRef.current = new Set();
       }
 
       // Nothing to update if no intervals and no duration
@@ -333,14 +366,20 @@ export default function useVideoProgress(userId, videoId) {
       }
 
       // Store current local intervals and progress
+      const currentProgress = isNaN(progressPercentage)
+        ? 0
+        : progressPercentage;
       const localData = {
         watchedIntervals: [...watchedIntervals],
-        progress: progressPercentage,
+        progress: currentProgress,
         lastWatchedTime: timeToSave || lastWatchedTime,
         totalDuration,
       };
 
       console.log("Syncing data with server:", localData);
+
+      // Preserve the current progress percentage in case the server call fails
+      const currentProgressBeforeSync = currentProgress;
 
       // Update data on the server
       const result = await updateProgress(userId, videoId, {
@@ -354,12 +393,12 @@ export default function useVideoProgress(userId, videoId) {
       // Only update local state if returned progress is higher
       const finalProgress = Math.max(
         result.progress,
-        progressPercentage,
+        currentProgressBeforeSync,
         highestProgressRef.current
       );
       highestProgressRef.current = finalProgress;
 
-      if (result.progress >= progressPercentage) {
+      if (result.progress >= currentProgressBeforeSync) {
         console.log("Using server progress data");
         // Update state with server response
         setProgressPercentage(finalProgress);
@@ -404,9 +443,13 @@ export default function useVideoProgress(userId, videoId) {
       console.error("Failed to sync progress with server:", err);
 
       // Even if server sync fails, update local storage
+      // but maintain the current progress percentage
+      const currentProgress = isNaN(progressPercentage)
+        ? 0
+        : progressPercentage;
       saveLocalProgress({
         watchedIntervals,
-        progress: progressPercentage,
+        progress: currentProgress,
         lastWatchedTime: currentTime || lastWatchedTime,
         totalDuration,
       });
@@ -421,7 +464,28 @@ export default function useVideoProgress(userId, videoId) {
    */
   const handleTimeUpdate = (currentTime) => {
     if (!currentTime || isNaN(currentTime)) return;
+
+    // Store the current progress before updating
+    const beforeUpdateProgress = progressPercentage;
+
+    // Update watching interval with the new time
     updateWatchingInterval(currentTime);
+
+    // If progress was reset to zero or NaN for some reason, restore it
+    // This is a safeguard against accidental resets
+    setTimeout(() => {
+      const afterUpdateProgress = progressPercentage;
+      if (
+        (isNaN(afterUpdateProgress) || afterUpdateProgress === 0) &&
+        !isNaN(beforeUpdateProgress) &&
+        beforeUpdateProgress > 0
+      ) {
+        console.log(
+          `Progress was reset during update. Restoring ${beforeUpdateProgress}%`
+        );
+        setProgressPercentage(beforeUpdateProgress);
+      }
+    }, 50);
   };
 
   /**
@@ -443,6 +507,10 @@ export default function useVideoProgress(userId, videoId) {
     if (!currentTime || isNaN(currentTime)) return;
     console.log("Video started playing at:", currentTime);
 
+    // Ensure we have a valid current time for calculations
+    const roundedTime = Math.floor(currentTime);
+    currentTimeRef.current = roundedTime;
+
     // Start a new interval when video plays
     startWatchingInterval(currentTime);
 
@@ -454,6 +522,12 @@ export default function useVideoProgress(userId, videoId) {
     updateTimerRef.current = setInterval(() => {
       // Use the latest time from the ref instead of the captured value
       console.log("Timer update, current time:", currentTimeRef.current);
+
+      // Make sure we don't lose progress during periodic updates
+      if (currentIntervalRef.current) {
+        saveInterval({ ...currentIntervalRef.current });
+      }
+
       syncWithServer(currentTimeRef.current);
     }, 5000); // Update every 5 seconds
   };
@@ -466,8 +540,36 @@ export default function useVideoProgress(userId, videoId) {
     if (!currentTime || isNaN(currentTime)) return;
     console.log("Video paused at:", currentTime);
 
+    // Ensure we have a valid current time for calculations
+    currentTimeRef.current = Math.floor(currentTime);
+
+    // First save current interval if it exists
+    if (currentIntervalRef.current) {
+      saveInterval({ ...currentIntervalRef.current });
+    }
+
+    // Store the current progress percentage before syncing
+    const currentProgressValue = progressPercentage;
+    console.log("Storing current progress before pause:", currentProgressValue);
+
     // Sync with server when video is paused
     syncWithServer(currentTime);
+
+    // Ensure progress doesn't reset after sync by explicitly setting it back
+    // This is a safeguard in case syncWithServer resets the value
+    setTimeout(() => {
+      console.log("Restoring progress after pause:", currentProgressValue);
+      // Only restore if higher than current (to prevent overriding a better value)
+      if (!isNaN(currentProgressValue) && currentProgressValue > 0) {
+        const currentProgressAfterSync = progressPercentage;
+        if (
+          isNaN(currentProgressAfterSync) ||
+          currentProgressValue > currentProgressAfterSync
+        ) {
+          setProgressPercentage(currentProgressValue);
+        }
+      }
+    }, 100);
 
     // Clear the update timer
     if (updateTimerRef.current) {

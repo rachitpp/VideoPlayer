@@ -23,17 +23,6 @@ export const videos = [
   },
   {
     id: "video3",
-    title: "Sintel",
-    description:
-      "Third open movie by the Blender Foundation about a girl searching for a dragon",
-    thumbnail:
-      "https://storage.googleapis.com/gtv-videos-bucket/sample/images/Sintel.jpg",
-    duration: "14:48",
-    source:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
-  },
-  {
-    id: "video4",
     title: "Tears of Steel",
     description: "Sci-fi film about a group of warriors and scientists",
     thumbnail:
@@ -41,6 +30,17 @@ export const videos = [
     duration: "12:14",
     source:
       "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+  },
+  {
+    id: "video4",
+    title: "For Bigger Escapes",
+    description:
+      "Introducing Chromecast. The easiest way to enjoy online video and music on your TV.",
+    thumbnail:
+      "https://storage.googleapis.com/gtv-videos-bucket/sample/images/ForBiggerEscapes.jpg",
+    duration: "0:15",
+    source:
+      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
   },
 ];
 

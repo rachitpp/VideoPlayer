@@ -7,47 +7,123 @@ function HomePage() {
     <div className="home-container">
       <header className="header">
         <div className="logo">
-          <span className="logo-icon">▶</span>
-          <h1>VideoTracker</h1>
+          <div className="logo-wrapper">
+            <span className="logo-icon">▶</span>
+            <h1>CineTrack</h1>
+          </div>
+          <p className="tagline">Remember every moment</p>
         </div>
-        <p className="tagline">Smart progress tracking</p>
+        <nav className="nav-links">
+          <a href="#features">Features</a>
+          <a href="#videos">Library</a>
+          <a href="#" className="btn-account">
+            My Account
+          </a>
+        </nav>
       </header>
 
-      <section className="info-banner">
-        <div className="info-content">
-          <h2>Track your watching progress with precision</h2>
+      <section className="hero-section">
+        <div className="hero-content">
+          <h1>
+            Watch. Track. <span className="highlight">Remember.</span>
+          </h1>
           <p>
-            Unlike traditional video players that only track the furthest point
-            reached, our system records exactly which seconds you've watched.
+            Never lose your place again. Our intelligent tracking system
+            remembers exactly which parts you've watched, so you can pick up
+            right where you left off.
           </p>
+          <div className="hero-buttons">
+            <a href="#videos" className="btn-primary">
+              Browse Videos
+            </a>
+            <a href="#features" className="btn-secondary">
+              Learn More
+            </a>
+          </div>
+        </div>
+        <div className="hero-image">
+          <div className="video-player-mockup">
+            <div className="mockup-header">
+              <div className="controls-dot"></div>
+              <div className="controls-dot"></div>
+              <div className="controls-dot"></div>
+            </div>
+            <div className="mockup-content">
+              <div className="play-button-large">▶</div>
+            </div>
+            <div className="mockup-progress">
+              <div className="progress-track">
+                <div className="progress-segments">
+                  <div className="segment watched"></div>
+                  <div className="segment unwatched"></div>
+                  <div className="segment watched"></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section className="features">
-        <div className="feature">
-          <div className="feature-icon">⏱️</div>
-          <h3>Second-Level Precision</h3>
-          <p>Records exactly which parts of videos you've watched</p>
-        </div>
-        <div className="feature">
-          <div className="feature-icon">💾</div>
-          <h3>Progress Syncing</h3>
-          <p>Your progress is saved and synced across sessions</p>
-        </div>
-        <div className="feature">
-          <div className="feature-icon">↩️</div>
-          <h3>Smart Resume</h3>
-          <p>Continue exactly where you left off</p>
-        </div>
-        <div className="feature">
-          <div className="feature-icon">📊</div>
-          <h3>Detailed Stats</h3>
-          <p>View your watching habits and progress</p>
+      <section id="features" className="features-section">
+        <h2 className="section-title">
+          Why Choose <span className="highlight">CineTrack</span>?
+        </h2>
+
+        <div className="features">
+          <div className="feature">
+            <div className="feature-icon">⏱️</div>
+            <div className="feature-content">
+              <h3>Second-Level Precision</h3>
+              <p>
+                Our technology tracks exactly which parts of the video you've
+                watched, not just your furthest point.
+              </p>
+            </div>
+          </div>
+
+          <div className="feature">
+            <div className="feature-icon">💾</div>
+            <div className="feature-content">
+              <h3>Seamless Syncing</h3>
+              <p>
+                Your progress is automatically saved and synced across all your
+                devices and sessions.
+              </p>
+            </div>
+          </div>
+
+          <div className="feature">
+            <div className="feature-icon">↩️</div>
+            <div className="feature-content">
+              <h3>Smart Resume</h3>
+              <p>
+                Continue exactly where you left off, even if you closed your
+                browser weeks ago.
+              </p>
+            </div>
+          </div>
+
+          <div className="feature">
+            <div className="feature-icon">📊</div>
+            <div className="feature-content">
+              <h3>Viewing Insights</h3>
+              <p>
+                Gain insights into your watching habits with detailed analytics
+                and progress reports.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section className="video-section">
-        <h2>Available Videos</h2>
+      <section id="videos" className="video-section">
+        <div className="section-header">
+          <h2 className="section-title">Featured Collection</h2>
+          <div className="section-actions">
+            <button className="btn-view-all">View All</button>
+          </div>
+        </div>
+
         <div className="video-grid">
           {videos.map((video) => (
             <Link
@@ -72,9 +148,42 @@ function HomePage() {
       </section>
 
       <footer className="footer">
-        <p>
-          © 2023 Video Progress Tracker | <a href="#top">Back to top</a>
-        </p>
+        <div className="footer-content">
+          <div className="footer-logo">
+            <span className="logo-icon small">▶</span>
+            <span className="footer-brand">CineTrack</span>
+          </div>
+
+          <div className="footer-links">
+            <div className="footer-column">
+              <h4>Company</h4>
+              <a href="#">About Us</a>
+              <a href="#">Contact</a>
+              <a href="#">Careers</a>
+            </div>
+            <div className="footer-column">
+              <h4>Resources</h4>
+              <a href="#">Help Center</a>
+              <a href="#">Privacy</a>
+              <a href="#">Terms</a>
+            </div>
+          </div>
+        </div>
+
+        <div className="footer-bottom">
+          <p>© 2023 CineTrack - Precision Video Progress Tracking</p>
+          <div className="social-links">
+            <a href="#" className="social-icon">
+              📱
+            </a>
+            <a href="#" className="social-icon">
+              💻
+            </a>
+            <a href="#" className="social-icon">
+              📧
+            </a>
+          </div>
+        </div>
       </footer>
     </div>
   );

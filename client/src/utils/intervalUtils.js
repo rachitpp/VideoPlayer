@@ -87,14 +87,17 @@ export function calculateWatchedSeconds(intervals) {
  * @returns {Number} - Progress percentage (0-100)
  */
 export function calculateProgress(intervals, totalDuration) {
-  if (!totalDuration || totalDuration <= 0) return 0;
+  if (!totalDuration || totalDuration <= 0 || isNaN(totalDuration)) return 0;
 
   const watchedSeconds = calculateWatchedSeconds(intervals);
 
   // Handle invalid values
-  if (watchedSeconds <= 0) return 0;
+  if (watchedSeconds <= 0 || isNaN(watchedSeconds)) return 0;
 
   const progressPercentage = (watchedSeconds / totalDuration) * 100;
+
+  // Check if result is a valid number
+  if (isNaN(progressPercentage)) return 0;
 
   // Round to 2 decimal places and ensure it doesn't exceed 100%
   const result = Math.min(Math.round(progressPercentage * 100) / 100, 100);
