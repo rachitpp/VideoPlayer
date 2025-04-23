@@ -5,28 +5,47 @@
  */
 export function mergeIntervals(intervals) {
   if (!intervals || intervals.length === 0) return [];
-  
-  console.log('Merging intervals input:', intervals);
-  
-  // Sort intervals by start time
-  const sortedIntervals = [...intervals].sort((a, b) => a.start - b.start);
-  
+
+  console.log("Merging intervals input:", JSON.stringify(intervals));
+
+  // Ensure all intervals are valid objects with start and end properties
+  const validIntervals = intervals.filter(
+    (interval) =>
+      interval &&
+      typeof interval === "object" &&
+      interval.start !== undefined &&
+      interval.end !== undefined &&
+      !isNaN(interval.start) &&
+      !isNaN(interval.end) &&
+      interval.start <= interval.end
+  );
+
+  if (validIntervals.length === 0) return [];
+
+  // Deep clone to avoid modifying the original objects
+  const sortedIntervals = validIntervals
+    .map((interval) => ({ start: interval.start, end: interval.end }))
+    .sort((a, b) => a.start - b.start);
+
   const result = [sortedIntervals[0]];
-  
+
   for (let i = 1; i < sortedIntervals.length; i++) {
     const currentInterval = sortedIntervals[i];
     const lastMergedInterval = result[result.length - 1];
-    
+
     // If current interval overlaps with the last merged interval, merge them
     if (currentInterval.start <= lastMergedInterval.end + 1) {
-      lastMergedInterval.end = Math.max(lastMergedInterval.end, currentInterval.end);
+      lastMergedInterval.end = Math.max(
+        lastMergedInterval.end,
+        currentInterval.end
+      );
     } else {
       // Add the current interval to the result if it doesn't overlap
       result.push(currentInterval);
     }
   }
-  
-  console.log('Merging intervals output:', result);
+
+  console.log("Merging intervals output:", JSON.stringify(result));
   return result;
 }
 
@@ -37,12 +56,26 @@ export function mergeIntervals(intervals) {
  */
 export function calculateWatchedSeconds(intervals) {
   if (!intervals || intervals.length === 0) return 0;
-  
+
+  // Calculate total seconds across all intervals, handling invalid intervals
   const totalSeconds = intervals.reduce((total, interval) => {
-    const seconds = interval.end - interval.start + 1;
+    // Skip invalid intervals
+    if (
+      !interval ||
+      typeof interval !== "object" ||
+      interval.start === undefined ||
+      interval.end === undefined ||
+      isNaN(interval.start) ||
+      isNaN(interval.end) ||
+      interval.start > interval.end
+    ) {
+      return total;
+    }
+
+    const seconds = Math.max(0, interval.end - interval.start + 1);
     return total + seconds;
   }, 0);
-  
+
   console.log(`Calculated total watched seconds: ${totalSeconds}`);
   return totalSeconds;
 }
@@ -55,18 +88,20 @@ export function calculateWatchedSeconds(intervals) {
  */
 export function calculateProgress(intervals, totalDuration) {
   if (!totalDuration || totalDuration <= 0) return 0;
-  
+
   const watchedSeconds = calculateWatchedSeconds(intervals);
-  
+
   // Handle invalid values
   if (watchedSeconds <= 0) return 0;
-  
+
   const progressPercentage = (watchedSeconds / totalDuration) * 100;
-  
+
   // Round to 2 decimal places and ensure it doesn't exceed 100%
   const result = Math.min(Math.round(progressPercentage * 100) / 100, 100);
-  
-  console.log(`Progress calculation: ${watchedSeconds}s / ${totalDuration}s = ${result}%`);
+
+  console.log(
+    `Progress calculation: ${watchedSeconds}s / ${totalDuration}s = ${result}%`
+  );
   return result;
 }
 
@@ -77,12 +112,30 @@ export function calculateProgress(intervals, totalDuration) {
  * @returns {Boolean} - Whether the second is in any interval
  */
 export function isSecondWatched(second, intervals) {
-  if (!intervals || intervals.length === 0) return false;
-  
+  if (
+    !intervals ||
+    intervals.length === 0 ||
+    second === undefined ||
+    isNaN(second)
+  )
+    return false;
+
   for (const interval of intervals) {
+    // Skip invalid intervals
+    if (
+      !interval ||
+      typeof interval !== "object" ||
+      interval.start === undefined ||
+      interval.end === undefined ||
+      isNaN(interval.start) ||
+      isNaN(interval.end)
+    ) {
+      continue;
+    }
+
     if (second >= interval.start && second <= interval.end) {
       return true;
     }
   }
   return false;
-} 
+}
