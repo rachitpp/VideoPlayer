@@ -146,7 +146,7 @@ function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
     () => (
       <div className="debug-panel">
         <div className="debug-section-title">
-          <h4>Debug Information</h4>
+          <h4>Video Info</h4>
           <span className="debug-badge">
             {watchedIntervals.length} intervals
           </span>
