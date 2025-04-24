@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   /* ───────── design tokens ───────── */
   --color-bg: #fcfcfc;
@@ -62,7 +64,7 @@ a {
   transition: color var(--anim-fast) ease;
 }
 a::after {
-  content: '';
+  content: "";
   position: absolute;
   width: 100%;
   height: 1px;
@@ -102,7 +104,9 @@ a:hover::after {
 }
 
 @media (prefers-reduced-motion) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation: none !important;
     transition: none !important;
   }
@@ -118,5 +122,7 @@ a:hover::after {
 }
 
 @media screen and (max-width: 768px) {
-  html { font-size: 90%; }
+  html {
+    font-size: 90%;
+  }
 }

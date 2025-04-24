@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import useVideoProgress from "../hooks/useVideoProgress";
 import "./VideoPlayer.css";
+import React from "react";
 
 function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
   const videoRef = useRef(null);
@@ -77,11 +78,20 @@ function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
     }
   };
 
+  // Handle video events with optimization
   const handleVideoTimeUpdate = () => {
     const videoElement = videoRef.current;
     if (videoElement) {
       const newTime = videoElement.currentTime;
-      setCurrentTime(newTime);
+
+      // Only update the UI time display every 500ms to reduce renders
+      const now = Date.now();
+      if (now - (handleVideoTimeUpdate.lastUIUpdate || 0) > 500) {
+        handleVideoTimeUpdate.lastUIUpdate = now;
+        setCurrentTime(newTime);
+      }
+
+      // Always pass time updates to the tracking hook
       handleTimeUpdate(newTime);
     }
   };
@@ -118,6 +128,109 @@ function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
   const toggleDebug = () => {
     setDebug(!debug);
   };
+
+  // Handle browser/tab close events
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Force a final sync before page unloads
+      const videoElement = videoRef.current;
+      if (videoElement) {
+        console.log("Page unloading, syncing final progress...");
+        syncWithServer(videoElement.currentTime);
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [syncWithServer]);
+
+  // Use memo for the debug panel to prevent unnecessary re-renders
+  const debugPanel = React.useMemo(
+    () => (
+      <div className="debug-panel">
+        <div className="debug-section-title">
+          <h4>Debug Information</h4>
+          <span className="debug-badge">
+            {watchedIntervals.length} intervals
+          </span>
+        </div>
+
+        <p>
+          Video Duration:{" "}
+          <span className="time-value">
+            {formatTime(videoDuration)} ({videoDuration.toFixed(2)}s)
+          </span>
+        </p>
+        <p>
+          Current Time:{" "}
+          <span className="time-value">
+            {formatTime(currentTime)} ({currentTime.toFixed(2)}s)
+          </span>
+        </p>
+        <p>
+          Progress:{" "}
+          <span className="percentage-value">
+            {safeProgressPercentage.toFixed(2)}%
+          </span>
+        </p>
+        <p>
+          Last Watched Time:{" "}
+          <span className="time-value">
+            {formatTime(lastWatchedTime)} ({lastWatchedTime}s)
+          </span>
+        </p>
+        <p>
+          Total Duration (Server):{" "}
+          <span className="time-value">
+            {formatTime(totalDuration)} ({totalDuration}s)
+          </span>
+        </p>
+        <p>
+          Total Intervals:{" "}
+          <span className="count-value">{watchedIntervals.length}</span>
+        </p>
+        <p>
+          Total Unique Seconds:{" "}
+          <span className="count-value">
+            {watchedIntervals.reduce(
+              (sum, interval) => sum + (interval.end - interval.start + 1),
+              0
+            )}
+            s
+          </span>
+        </p>
+
+        <h5>Watched Intervals</h5>
+        <ul>
+          {watchedIntervals.length > 0 ? (
+            watchedIntervals.map((interval, index) => (
+              <li key={index}>
+                <span className="time-value">{formatTime(interval.start)}</span>{" "}
+                -<span className="time-value">{formatTime(interval.end)}</span>
+                <span className="count-value">
+                  ({interval.end - interval.start + 1}s)
+                </span>
+              </li>
+            ))
+          ) : (
+            <li>No intervals tracked yet</li>
+          )}
+        </ul>
+      </div>
+    ),
+    [
+      watchedIntervals,
+      videoDuration,
+      currentTime,
+      safeProgressPercentage,
+      lastWatchedTime,
+      totalDuration,
+      formatTime,
+    ]
+  );
 
   if (loading) {
     return (
@@ -186,82 +299,7 @@ function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
           </div>
 
           {debug ? (
-            <div className="debug-panel">
-              <div className="debug-section-title">
-                <h4>Debug Information</h4>
-                <span className="debug-badge">
-                  {watchedIntervals.length} intervals
-                </span>
-              </div>
-
-              <p>
-                Video Duration:{" "}
-                <span className="time-value">
-                  {formatTime(videoDuration)} ({videoDuration.toFixed(2)}s)
-                </span>
-              </p>
-              <p>
-                Current Time:{" "}
-                <span className="time-value">
-                  {formatTime(currentTime)} ({currentTime.toFixed(2)}s)
-                </span>
-              </p>
-              <p>
-                Progress:{" "}
-                <span className="percentage-value">
-                  {safeProgressPercentage.toFixed(2)}%
-                </span>
-              </p>
-              <p>
-                Last Watched Time:{" "}
-                <span className="time-value">
-                  {formatTime(lastWatchedTime)} ({lastWatchedTime}s)
-                </span>
-              </p>
-              <p>
-                Total Duration (Server):{" "}
-                <span className="time-value">
-                  {formatTime(totalDuration)} ({totalDuration}s)
-                </span>
-              </p>
-              <p>
-                Total Intervals:{" "}
-                <span className="count-value">{watchedIntervals.length}</span>
-              </p>
-              <p>
-                Total Unique Seconds:{" "}
-                <span className="count-value">
-                  {watchedIntervals.reduce(
-                    (sum, interval) =>
-                      sum + (interval.end - interval.start + 1),
-                    0
-                  )}
-                  s
-                </span>
-              </p>
-
-              <h5>Watched Intervals</h5>
-              <ul>
-                {watchedIntervals.length > 0 ? (
-                  watchedIntervals.map((interval, index) => (
-                    <li key={index}>
-                      <span className="time-value">
-                        {formatTime(interval.start)}
-                      </span>{" "}
-                      -
-                      <span className="time-value">
-                        {formatTime(interval.end)}
-                      </span>
-                      <span className="count-value">
-                        ({interval.end - interval.start + 1}s)
-                      </span>
-                    </li>
-                  ))
-                ) : (
-                  <li>No intervals tracked yet</li>
-                )}
-              </ul>
-            </div>
+            debugPanel
           ) : (
             <div className="debug-info-container">
               <div className="total-watched">

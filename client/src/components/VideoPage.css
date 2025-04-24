@@ -6,10 +6,15 @@
 
 .video-page-header {
   margin-bottom: 25px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .back-button {
   margin-bottom: 15px;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .back-link {
@@ -39,9 +44,14 @@
   background-color: #7934d6;
 }
 
+.video-page-info {
+  flex: 1;
+  margin-left: 40px;
+}
+
 .video-page-info h1 {
-  font-size: 2rem;
-  margin: 0 0 10px 0;
+  font-size: 1.5rem;
+  margin: 10px 0 10px 0;
   color: #343a40;
 }
 
@@ -109,7 +119,7 @@
 /* Responsive Adjustments */
 @media (max-width: 768px) {
   .video-page-info h1 {
-    font-size: 1.8rem;
+    font-size: 1.3rem;
   }
 
   .video-page-info p {

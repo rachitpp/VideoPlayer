@@ -31,17 +31,6 @@ export const videos = [
     source:
       "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
   },
-  {
-    id: "video4",
-    title: "For Bigger Escapes",
-    description:
-      "Introducing Chromecast. The easiest way to enjoy online video and music on your TV.",
-    thumbnail:
-      "https://storage.googleapis.com/gtv-videos-bucket/sample/images/ForBiggerEscapes.jpg",
-    duration: "0:15",
-    source:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-  },
 ];
 
 // Helper function to find a video by ID

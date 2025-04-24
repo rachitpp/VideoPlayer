@@ -102,17 +102,6 @@ function HomePage() {
               </p>
             </div>
           </div>
-
-          <div className="feature">
-            <div className="feature-icon">📊</div>
-            <div className="feature-content">
-              <h3>Viewing Insights</h3>
-              <p>
-                Gain insights into your watching habits with detailed analytics
-                and progress reports.
-              </p>
-            </div>
-          </div>
         </div>
       </section>
 

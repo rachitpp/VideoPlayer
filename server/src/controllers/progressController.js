@@ -2,6 +2,25 @@ const Progress = require("../models/Progress");
 const { mergeIntervals, calculateProgress } = require("../utils/intervalUtils");
 
 /**
+ * Validates interval structure
+ * @param {Array} intervals - Array of intervals to validate
+ * @returns {Boolean} - Whether the intervals are valid
+ */
+function validateIntervals(intervals) {
+  if (!intervals || !Array.isArray(intervals)) return false;
+
+  return intervals.every(
+    (interval) =>
+      interval &&
+      typeof interval === "object" &&
+      Number.isFinite(interval.start) &&
+      Number.isFinite(interval.end) &&
+      interval.start >= 0 &&
+      interval.end >= interval.start
+  );
+}
+
+/**
  * Get progress for a specific user and video
  */
 exports.getProgress = async (req, res) => {
@@ -67,6 +86,14 @@ exports.updateProgress = async (req, res) => {
       return res.status(400).json({
         message:
           "Invalid request. newIntervals array and totalDuration are required",
+      });
+    }
+
+    // Validate interval structure
+    if (!validateIntervals(newIntervals)) {
+      return res.status(400).json({
+        message:
+          "Invalid intervals format. Each interval must have valid start and end properties",
       });
     }
 
