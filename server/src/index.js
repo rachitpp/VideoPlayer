@@ -100,3 +100,4 @@ function startServer() {
     );
   });
 }
+module.exports = app;
