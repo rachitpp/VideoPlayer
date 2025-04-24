@@ -4,20 +4,20 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const rateLimit = require("express-rate-limit");
 
-// Import routes
+// Routes for handling progress data
 const progressRoutes = require("./routes/progress");
 
-// Config
+// Config and setup
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Reconnection timer
+// Timer for MongoDB reconnection attempts
 let reconnectTimer;
 
-// Setup rate limiter
+// Limit API requests to prevent abuse
 const apiLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
+  windowMs: 1 * 60 * 1000, // 1 minute window
   max: 60, // 60 requests per minute
   standardHeaders: true,
   message: { error: "Too many requests, please try again later" },
@@ -38,7 +38,7 @@ function setupMongoReconnect() {
         console.error("MongoDB reconnection failed:", error);
         setupMongoReconnect(); // Try again later
       });
-  }, 60000); // Try every minute
+  }, 60000); // Every minute
 }
 
 // Basic CORS setup
@@ -49,7 +49,7 @@ app.use(express.json());
 // Apply rate limiting to API routes
 app.use("/api", apiLimiter);
 
-// In-memory store as fallback if MongoDB fails
+// Fallback storage if MongoDB is down
 global.inMemoryStore = {
   progressData: {},
   saveProgress: function (userId, videoId, data) {
@@ -63,13 +63,13 @@ global.inMemoryStore = {
   },
 };
 
-// Set a flag for DB connection status
+// Track database connection status
 global.isDbConnected = false;
 
-// Routes
+// Set up API routes
 app.use("/api/progress", progressRoutes);
 
-// Default route
+// Home route - shows basic info
 app.get("/", (req, res) => {
   res.json({
     message: "Lecture Video Progress Tracker API",

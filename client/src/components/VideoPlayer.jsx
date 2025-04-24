@@ -10,7 +10,7 @@ function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
   const [videoDuration, setVideoDuration] = useState(0);
   const [debug, setDebug] = useState(false);
 
-  // Use the custom hook to track progress with props
+  // Our custom hook handles all the progress tracking magic
   const {
     loading,
     error,
@@ -25,12 +25,10 @@ function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
     syncWithServer,
   } = useVideoProgress(userId, videoId);
 
-  // Add a safeguard against NaN progress values
+  // Guard against NaN values in progress
   const [safeProgressPercentage, setSafeProgressPercentage] = useState(0);
 
-  // Update the safe progress value whenever progressPercentage changes
   useEffect(() => {
-    // Only update if the new value is valid and greater than current
     if (!isNaN(rawProgressPercentage) && rawProgressPercentage > 0) {
       setSafeProgressPercentage((prev) =>
         Math.max(prev, rawProgressPercentage)
@@ -41,7 +39,7 @@ function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
     }
   }, [rawProgressPercentage]);
 
-  // Format time (seconds) to MM:SS
+  // Format seconds to MM:SS display
   const formatTime = (seconds) => {
     if (!seconds) return "00:00";
     const mins = Math.floor(seconds / 60);
@@ -51,7 +49,7 @@ function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
       .padStart(2, "0")}`;
   };
 
-  // Set video to last watched position when loaded
+  // Jump to the last position when video loads
   useEffect(() => {
     const videoElement = videoRef.current;
     if (videoElement && lastWatchedTime > 0 && !loading) {
@@ -61,7 +59,6 @@ function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
     }
   }, [videoRef, lastWatchedTime, loading]);
 
-  // Handle video events
   const handleVideoPlay = () => {
     const videoElement = videoRef.current;
     if (videoElement) {
@@ -78,20 +75,18 @@ function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
     }
   };
 
-  // Handle video events with optimization
   const handleVideoTimeUpdate = () => {
     const videoElement = videoRef.current;
     if (videoElement) {
       const newTime = videoElement.currentTime;
 
-      // Only update the UI time display every 500ms to reduce renders
+      // Update UI less frequently to avoid render spam
       const now = Date.now();
       if (now - (handleVideoTimeUpdate.lastUIUpdate || 0) > 500) {
         handleVideoTimeUpdate.lastUIUpdate = now;
         setCurrentTime(newTime);
       }
 
-      // Always pass time updates to the tracking hook
       handleTimeUpdate(newTime);
     }
   };
@@ -129,10 +124,9 @@ function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
     setDebug(!debug);
   };
 
-  // Handle browser/tab close events
+  // Save progress when user closes the page
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // Force a final sync before page unloads
       const videoElement = videoRef.current;
       if (videoElement) {
         console.log("Page unloading, syncing final progress...");
@@ -147,7 +141,7 @@ function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
     };
   }, [syncWithServer]);
 
-  // Use memo for the debug panel to prevent unnecessary re-renders
+  // Debug panel is memoized to prevent unnecessary renders
   const debugPanel = React.useMemo(
     () => (
       <div className="debug-panel">
@@ -298,18 +292,7 @@ function VideoPlayer({ videoUrl, videoId, userId = "user123" }) {
             </button>
           </div>
 
-          {debug ? (
-            debugPanel
-          ) : (
-            <div className="debug-info-container">
-              <div className="total-watched">
-                Total watched:{" "}
-                <span className="percentage">
-                  {safeProgressPercentage.toFixed(2)}%
-                </span>
-              </div>
-            </div>
-          )}
+          {debug && debugPanel}
         </div>
       </div>
     </div>

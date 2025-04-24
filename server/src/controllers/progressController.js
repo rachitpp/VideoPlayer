@@ -1,11 +1,7 @@
 const Progress = require("../models/Progress");
 const { mergeIntervals, calculateProgress } = require("../utils/intervalUtils");
 
-/**
- * Validates interval structure
- * @param {Array} intervals - Array of intervals to validate
- * @returns {Boolean} - Whether the intervals are valid
- */
+// Make sure intervals are properly formatted
 function validateIntervals(intervals) {
   if (!intervals || !Array.isArray(intervals)) return false;
 
@@ -20,14 +16,12 @@ function validateIntervals(intervals) {
   );
 }
 
-/**
- * Get progress for a specific user and video
- */
+// Retrieve progress data for a user/video combination
 exports.getProgress = async (req, res) => {
   try {
     const { userId, videoId } = req.params;
 
-    // If MongoDB is not connected, use in-memory store
+    // Fall back to in-memory if MongoDB is down
     if (!global.isDbConnected) {
       const inMemoryData = global.inMemoryStore.getProgress(userId, videoId);
 
@@ -44,7 +38,7 @@ exports.getProgress = async (req, res) => {
       });
     }
 
-    // If MongoDB is connected, use it
+    // Normal MongoDB flow
     const progress = await Progress.findOne({ userId, videoId });
 
     if (!progress) {
@@ -67,9 +61,7 @@ exports.getProgress = async (req, res) => {
   }
 };
 
-/**
- * Update progress for a specific user and video
- */
+// Update a user's progress for a specific video
 exports.updateProgress = async (req, res) => {
   try {
     const { userId, videoId } = req.params;
@@ -89,7 +81,7 @@ exports.updateProgress = async (req, res) => {
       });
     }
 
-    // Validate interval structure
+    // Make sure intervals are formatted properly
     if (!validateIntervals(newIntervals)) {
       return res.status(400).json({
         message:
@@ -97,9 +89,9 @@ exports.updateProgress = async (req, res) => {
       });
     }
 
-    // If MongoDB is not connected, use in-memory store
+    // Use in-memory store if MongoDB isn't available
     if (!global.isDbConnected) {
-      // Get existing progress data
+      // Get existing data or create defaults
       let existingData = global.inMemoryStore.getProgress(userId, videoId);
 
       if (!existingData) {
@@ -111,16 +103,16 @@ exports.updateProgress = async (req, res) => {
         };
       }
 
-      // Update the last watched time if provided
+      // Update last position if provided
       if (req.body.lastWatchedTime !== undefined) {
         existingData.lastWatchedTime = req.body.lastWatchedTime;
       }
 
-      // Create copies of intervals to avoid reference issues
+      // Create copies to avoid reference issues
       const deepCopyIntervals = (arr) =>
         arr.map((interval) => ({ ...interval }));
 
-      // Merge new intervals with existing ones
+      // Combine existing and new intervals
       const allIntervals = [
         ...deepCopyIntervals(existingData.watchedIntervals),
         ...deepCopyIntervals(newIntervals),
@@ -129,18 +121,16 @@ exports.updateProgress = async (req, res) => {
 
       console.log("Merged intervals:", mergedIntervals.length);
 
-      // Calculate new progress percentage
+      // Calculate updated progress
       const newProgress = calculateProgress(mergedIntervals, totalDuration);
       console.log(`Calculated progress: ${newProgress}%`);
 
-      // Determine final progress - respect forceProgress if provided
+      // Use client's progress value if provided, otherwise ensure we never go backward
       let finalProgress;
       if (forceProgress !== undefined) {
-        // If client explicitly sent a progress value, respect it
         finalProgress = forceProgress;
         console.log(`Using client-provided forced progress: ${finalProgress}%`);
       } else {
-        // Otherwise ensure progress never goes backward
         finalProgress = Math.max(newProgress, existingData.progress || 0);
 
         if (finalProgress !== newProgress) {
@@ -150,7 +140,7 @@ exports.updateProgress = async (req, res) => {
         }
       }
 
-      // Update data
+      // Prepare the updated data
       const updatedData = {
         watchedIntervals: mergedIntervals,
         progress: finalProgress,
@@ -158,7 +148,7 @@ exports.updateProgress = async (req, res) => {
         totalDuration,
       };
 
-      // Save to in-memory store
+      // Save to memory
       global.inMemoryStore.saveProgress(userId, videoId, updatedData);
 
       return res.status(200).json({
@@ -171,8 +161,7 @@ exports.updateProgress = async (req, res) => {
       });
     }
 
-    // If MongoDB is connected, use normal flow
-    // Find existing progress or create new one
+    // MongoDB is connected - normal flow
     let progress = await Progress.findOne({ userId, videoId });
 
     if (!progress) {
@@ -186,33 +175,34 @@ exports.updateProgress = async (req, res) => {
       });
     }
 
-    // Update the last watched time if provided
+    // Update last position if provided
     if (req.body.lastWatchedTime !== undefined) {
       progress.lastWatchedTime = req.body.lastWatchedTime;
     }
 
-    // Create copies of intervals to avoid reference issues
+    // Create copies to avoid reference issues
     const deepCopyIntervals = (arr) => arr.map((interval) => ({ ...interval }));
 
-    // Merge new intervals with existing ones
+    // Combine existing and new intervals
     const allIntervals = [
       ...deepCopyIntervals(progress.watchedIntervals),
       ...deepCopyIntervals(newIntervals),
     ];
     const mergedIntervals = mergeIntervals(allIntervals);
 
-    // Calculate new progress percentage
-    const newProgress = calculateProgress(mergedIntervals, totalDuration);
+    console.log("Merged intervals:", mergedIntervals.length);
 
-    // Determine final progress - respect forceProgress if provided
+    // Calculate updated progress
+    const newProgress = calculateProgress(mergedIntervals, totalDuration);
+    console.log(`Calculated progress: ${newProgress}%`);
+
+    // Don't let progress go backward unless explicitly told to
     let finalProgress;
     if (forceProgress !== undefined) {
-      // If client explicitly sent a progress value, respect it
       finalProgress = forceProgress;
       console.log(`Using client-provided forced progress: ${finalProgress}%`);
     } else {
-      // Otherwise ensure progress never goes backward
-      finalProgress = Math.max(newProgress, progress.progress || 0);
+      finalProgress = Math.max(newProgress, progress.progress);
 
       if (finalProgress !== newProgress) {
         console.log(
@@ -221,11 +211,12 @@ exports.updateProgress = async (req, res) => {
       }
     }
 
-    // Update progress document
+    // Update the document
     progress.watchedIntervals = mergedIntervals;
     progress.progress = finalProgress;
     progress.totalDuration = totalDuration;
 
+    // Save to MongoDB
     await progress.save();
 
     res.status(200).json({

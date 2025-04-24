@@ -1,11 +1,11 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const progressController = require('../controllers/progressController');
+const progressController = require("../controllers/progressController");
 
-// GET /api/progress/:userId/:videoId - Get progress for a specific user and video
-router.get('/:userId/:videoId', progressController.getProgress);
+// Get a user's progress for a specific video
+router.get("/:userId/:videoId", progressController.getProgress);
 
-// POST /api/progress/:userId/:videoId - Update progress for a specific user and video
-router.post('/:userId/:videoId', progressController.updateProgress);
+// Save updated progress for a video
+router.post("/:userId/:videoId", progressController.updateProgress);
 
-module.exports = router; 
+module.exports = router;

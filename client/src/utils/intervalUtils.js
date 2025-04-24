@@ -8,7 +8,7 @@ export function mergeIntervals(intervals) {
 
   console.log("Merging intervals input:", JSON.stringify(intervals));
 
-  // Ensure all intervals are valid objects with start and end properties
+  // Filter out garbage data - defensive coding ftw
   const validIntervals = intervals.filter(
     (interval) =>
       interval &&
@@ -22,7 +22,7 @@ export function mergeIntervals(intervals) {
 
   if (validIntervals.length === 0) return [];
 
-  // Deep clone to avoid modifying the original objects
+  // Make a copy and sort by start time
   const sortedIntervals = validIntervals
     .map((interval) => ({ start: interval.start, end: interval.end }))
     .sort((a, b) => a.start - b.start);
@@ -33,14 +33,14 @@ export function mergeIntervals(intervals) {
     const currentInterval = sortedIntervals[i];
     const lastMergedInterval = result[result.length - 1];
 
-    // If current interval overlaps with the last merged interval, merge them
+    // Add 1 second buffer to join nearly-adjacent intervals
     if (currentInterval.start <= lastMergedInterval.end + 1) {
       lastMergedInterval.end = Math.max(
         lastMergedInterval.end,
         currentInterval.end
       );
     } else {
-      // Add the current interval to the result if it doesn't overlap
+      // No overlap, add as separate interval
       result.push(currentInterval);
     }
   }
@@ -57,7 +57,6 @@ export function mergeIntervals(intervals) {
 export function calculateWatchedSeconds(intervals) {
   if (!intervals || intervals.length === 0) return 0;
 
-  // Calculate total seconds across all intervals, handling invalid intervals
   const totalSeconds = intervals.reduce((total, interval) => {
     // Skip invalid intervals
     if (
@@ -76,7 +75,7 @@ export function calculateWatchedSeconds(intervals) {
     return total + seconds;
   }, 0);
 
-  console.log(`Calculated total watched seconds: ${totalSeconds}`);
+  console.log(`Total watched: ${totalSeconds} seconds`);
   return totalSeconds;
 }
 
@@ -91,20 +90,16 @@ export function calculateProgress(intervals, totalDuration) {
 
   const watchedSeconds = calculateWatchedSeconds(intervals);
 
-  // Handle invalid values
   if (watchedSeconds <= 0 || isNaN(watchedSeconds)) return 0;
 
   const progressPercentage = (watchedSeconds / totalDuration) * 100;
 
-  // Check if result is a valid number
   if (isNaN(progressPercentage)) return 0;
 
-  // Round to 2 decimal places and ensure it doesn't exceed 100%
+  // Cap at 100% - can't watch more than the full video
   const result = Math.min(Math.round(progressPercentage * 100) / 100, 100);
 
-  console.log(
-    `Progress calculation: ${watchedSeconds}s / ${totalDuration}s = ${result}%`
-  );
+  console.log(`Progress: ${watchedSeconds}s / ${totalDuration}s = ${result}%`);
   return result;
 }
 
@@ -124,7 +119,7 @@ export function isSecondWatched(second, intervals) {
     return false;
 
   for (const interval of intervals) {
-    // Skip invalid intervals
+    // Skip bad data
     if (
       !interval ||
       typeof interval !== "object" ||

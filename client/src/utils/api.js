@@ -1,17 +1,11 @@
-// Use a relative URL with the API prefix
+// API URL relative to the server - easier for different environments
 const API_URL = "/api";
 
-/**
- * Get progress for a specific user and video
- * @param {String} userId - User ID
- * @param {String} videoId - Video ID
- * @returns {Promise} - Promise with progress data
- */
+// Fetches progress for a specific user and video combination
 export const getProgress = async (userId, videoId) => {
   try {
     const response = await fetch(`${API_URL}/progress/${userId}/${videoId}`);
 
-    // Handle different HTTP status codes
     if (response.status === 403) {
       console.warn(
         "Permission denied accessing progress data. Using fallback."
@@ -25,19 +19,16 @@ export const getProgress = async (userId, videoId) => {
     }
 
     if (!response.ok) {
-      // For non-403 errors
       try {
         const errorData = await response.json();
         throw new Error(errorData.message || "Failed to fetch progress");
       } catch {
-        // If response isn't valid JSON
         throw new Error(
           `Server error: ${response.status} ${response.statusText}`
         );
       }
     }
 
-    // Handle empty responses
     const text = await response.text();
     if (!text || text.trim() === "") {
       console.warn("Empty response from server. Using fallback data.");
@@ -49,7 +40,6 @@ export const getProgress = async (userId, videoId) => {
       };
     }
 
-    // Try to parse JSON
     try {
       return JSON.parse(text);
     } catch {
@@ -58,7 +48,6 @@ export const getProgress = async (userId, videoId) => {
     }
   } catch (error) {
     console.error("Error fetching progress:", error);
-    // If 404 not found or any other error, return default values
     return {
       progress: 0,
       watchedIntervals: [],
@@ -68,13 +57,7 @@ export const getProgress = async (userId, videoId) => {
   }
 };
 
-/**
- * Update progress for a specific user and video
- * @param {String} userId - User ID
- * @param {String} videoId - Video ID
- * @param {Object} progressData - Progress data to update
- * @returns {Promise} - Promise with updated progress data
- */
+// Sends updated progress data to the server
 export const updateProgress = async (userId, videoId, progressData) => {
   try {
     const response = await fetch(`${API_URL}/progress/${userId}/${videoId}`, {
@@ -85,43 +68,38 @@ export const updateProgress = async (userId, videoId, progressData) => {
       body: JSON.stringify(progressData),
     });
 
-    // Handle different HTTP status codes
     if (response.status === 403) {
       console.warn(
         "Permission denied updating progress data. Using local fallback only."
       );
-      return progressData; // Return the data we tried to send
+      return progressData;
     }
 
     if (!response.ok) {
-      // For non-403 errors
       try {
         const errorData = await response.json();
         throw new Error(errorData.message || "Failed to update progress");
       } catch {
-        // If response isn't valid JSON
         throw new Error(
           `Server error: ${response.status} ${response.statusText}`
         );
       }
     }
 
-    // Handle empty responses
     const text = await response.text();
     if (!text || text.trim() === "") {
       console.warn("Empty response from server after update. Using sent data.");
       return progressData;
     }
 
-    // Try to parse JSON
     try {
       return JSON.parse(text);
     } catch {
       console.error("Failed to parse server response");
-      return progressData; // Return the data we tried to send
+      return progressData;
     }
   } catch (error) {
     console.error("Error updating progress:", error);
-    return progressData; // Return the data we tried to send
+    return progressData;
   }
 };

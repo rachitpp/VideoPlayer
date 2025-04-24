@@ -6,22 +6,18 @@ import {
   isSecondWatched,
 } from "../utils/intervalUtils";
 
-// Local storage key for progress
+// Quick helper for local storage keys
 const getLocalStorageKey = (userId, videoId) =>
   `video_progress_${userId}_${videoId}`;
 
-/**
- * Clean up old localStorage entries to prevent storage issues
- */
+// Cleanup old localStorage entries so we don't bloat the browser
 const cleanupLocalStorage = () => {
   try {
-    // Get all keys
     const allKeys = Object.keys(localStorage);
     const videoProgressKeys = allKeys.filter((key) =>
       key.startsWith("video_progress_")
     );
 
-    // Keep only the 20 most recent entries
     if (videoProgressKeys.length > 20) {
       const keysToRemove = videoProgressKeys
         .map((key) => {
@@ -44,12 +40,7 @@ const cleanupLocalStorage = () => {
   }
 };
 
-/**
- * Custom hook for managing video progress
- * @param {String} userId - User ID
- * @param {String} videoId - Video ID
- * @returns {Object} - Video progress state and handlers
- */
+// Core hook for tracking what parts of a video someone's actually watched
 export default function useVideoProgress(userId, videoId) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -58,22 +49,14 @@ export default function useVideoProgress(userId, videoId) {
   const [lastWatchedTime, setLastWatchedTime] = useState(0);
   const [totalDuration, setTotalDuration] = useState(0);
 
-  // Current watching interval
-  const currentIntervalRef = useRef(null);
-  // Tracked seconds for current interval
-  const watchedSecondsRef = useRef(new Set());
-  // Timer for sending updates to server
-  const updateTimerRef = useRef(null);
-  // Current time ref for the timer
-  const currentTimeRef = useRef(0);
-  // Last saved intervals from server
-  const lastSavedIntervalsRef = useRef([]);
-  // Flag to track if a server sync is in progress
-  const isSyncingRef = useRef(false);
-  // Track the highest progress percentage we've seen
-  const highestProgressRef = useRef(0);
+  const currentIntervalRef = useRef(null); // Current watching interval
+  const watchedSecondsRef = useRef(new Set()); // For tracking unique seconds
+  const updateTimerRef = useRef(null); // For server sync timer
+  const currentTimeRef = useRef(0); // Last known position
+  const lastSavedIntervalsRef = useRef([]); // Server-synced intervals
+  const isSyncingRef = useRef(false); // Prevent parallel syncs
+  const highestProgressRef = useRef(0); // Never decrease progress
 
-  // Load any progress from local storage
   const loadLocalProgress = () => {
     try {
       const key = getLocalStorageKey(userId, videoId);
@@ -81,7 +64,7 @@ export default function useVideoProgress(userId, videoId) {
 
       if (savedData) {
         const data = JSON.parse(savedData);
-        console.log("Loaded local progress data:", data);
+        console.log("Found saved progress:", data);
         return data;
       }
     } catch (err) {
@@ -90,7 +73,6 @@ export default function useVideoProgress(userId, videoId) {
     return null;
   };
 
-  // Save progress to local storage
   const saveLocalProgress = (data) => {
     try {
       const key = getLocalStorageKey(userId, videoId);
@@ -101,11 +83,9 @@ export default function useVideoProgress(userId, videoId) {
           timestamp: Date.now(),
         })
       );
-      console.log("Saved progress to local storage");
+      console.log("Saved progress locally");
 
-      // Clean up periodically (throttled to not run on every save)
       if (Math.random() < 0.1) {
-        // ~10% chance to run cleanup
         cleanupLocalStorage();
       }
     } catch (err) {
@@ -113,46 +93,37 @@ export default function useVideoProgress(userId, videoId) {
     }
   };
 
-  // Fetch initial progress data
   useEffect(() => {
     async function fetchProgress() {
       try {
         setLoading(true);
 
-        // First check local storage for cached progress
         const localData = loadLocalProgress();
-
-        // Then fetch from server
         const serverData = await getProgress(userId, videoId);
-        console.log("Fetched server progress data:", serverData);
+        console.log("Got server data:", serverData);
 
-        // Determine which progress data to use (use higher progress value)
         let finalData = serverData;
 
-        if (localData) {
-          // If local data has higher progress, use it but merge intervals
-          if (localData.progress > serverData.progress) {
-            console.log("Local progress is higher, using local data");
-            finalData = {
-              ...serverData,
-              progress: localData.progress,
-              watchedIntervals: mergeIntervals([
-                ...(serverData.watchedIntervals || []),
-                ...(localData.watchedIntervals || []),
-              ]),
-            };
+        if (localData && localData.progress > serverData.progress) {
+          console.log("Local progress ahead of server, using that");
+          finalData = {
+            ...serverData,
+            progress: localData.progress,
+            watchedIntervals: mergeIntervals([
+              ...(serverData.watchedIntervals || []),
+              ...(localData.watchedIntervals || []),
+            ]),
+          };
 
-            // Immediately sync the merged data back to server
-            setTimeout(() => {
-              updateProgress(userId, videoId, {
-                newIntervals: finalData.watchedIntervals,
-                lastWatchedTime: finalData.lastWatchedTime,
-                totalDuration: finalData.totalDuration,
-              }).catch((err) =>
-                console.error("Error syncing merged progress:", err)
-              );
-            }, 1000);
-          }
+          setTimeout(() => {
+            updateProgress(userId, videoId, {
+              newIntervals: finalData.watchedIntervals,
+              lastWatchedTime: finalData.lastWatchedTime,
+              totalDuration: finalData.totalDuration,
+            }).catch((err) =>
+              console.error("Error syncing merged progress:", err)
+            );
+          }, 1000);
         }
 
         setWatchedIntervals(finalData.watchedIntervals || []);
@@ -164,18 +135,16 @@ export default function useVideoProgress(userId, videoId) {
           setTotalDuration(finalData.totalDuration);
         }
 
-        // Save the final data to local storage
         saveLocalProgress(finalData);
 
         setError(null);
       } catch (err) {
         setError(err.message);
-        console.error("Failed to fetch progress:", err);
+        console.error("Server fetch failed:", err);
 
-        // If server fetch fails, still try to load from local storage
         const localData = loadLocalProgress();
         if (localData) {
-          console.log("Using local progress data due to server error");
+          console.log("Using local data since server's not available");
           setWatchedIntervals(localData.watchedIntervals || []);
           lastSavedIntervalsRef.current = [
             ...(localData.watchedIntervals || []),
@@ -194,7 +163,6 @@ export default function useVideoProgress(userId, videoId) {
 
     fetchProgress();
 
-    // Clean up timer on unmount
     return () => {
       if (updateTimerRef.current) {
         clearInterval(updateTimerRef.current);
@@ -202,10 +170,6 @@ export default function useVideoProgress(userId, videoId) {
     };
   }, [userId, videoId]);
 
-  /**
-   * Start tracking a new watching interval
-   * @param {Number} currentTime - Current video time in seconds
-   */
   const startWatchingInterval = (currentTime) => {
     if (!currentTime || isNaN(currentTime)) return;
 
@@ -214,31 +178,23 @@ export default function useVideoProgress(userId, videoId) {
 
     console.log("Starting interval at:", roundedTime);
 
-    // Don't track if this second is already in watched intervals
     if (isSecondWatched(roundedTime, watchedIntervals)) {
       console.log("Second already watched, not starting new interval");
       return;
     }
 
-    // Start a new interval
     currentIntervalRef.current = {
       start: roundedTime,
       end: roundedTime,
     };
 
-    // Add to the set of watched seconds for this interval
     watchedSecondsRef.current = new Set([roundedTime]);
 
     console.log("New interval started:", currentIntervalRef.current);
 
-    // Add this interval to our state right away
     saveInterval(currentIntervalRef.current);
   };
 
-  /**
-   * Update the current watching interval
-   * @param {Number} currentTime - Current video time in seconds
-   */
   const updateWatchingInterval = (currentTime) => {
     if (!currentTime || isNaN(currentTime)) return;
 
@@ -250,7 +206,6 @@ export default function useVideoProgress(userId, videoId) {
       return;
     }
 
-    // Skip if this second is already watched (either in saved intervals or current interval)
     if (
       isSecondWatched(roundedTime, watchedIntervals) ||
       watchedSecondsRef.current.has(roundedTime)
@@ -258,39 +213,31 @@ export default function useVideoProgress(userId, videoId) {
       return;
     }
 
-    // If this time is continuous with the current interval, extend it
     if (roundedTime === currentIntervalRef.current.end + 1) {
       currentIntervalRef.current.end = roundedTime;
       watchedSecondsRef.current.add(roundedTime);
 
-      // Don't call saveInterval on every second, only update every 3 seconds
-      // to reduce rendering overhead during playback
       if (roundedTime % 3 === 0) {
         console.log("Extended interval:", currentIntervalRef.current);
         saveInterval(currentIntervalRef.current);
       }
-    }
-    // If there's a gap, send the current interval and start a new one
-    else if (roundedTime > currentIntervalRef.current.end + 1) {
+    } else if (roundedTime > currentIntervalRef.current.end + 1) {
       const intervalToSave = { ...currentIntervalRef.current };
       console.log("Gap detected, saving interval:", intervalToSave);
 
-      // Save the previous interval
       saveInterval(intervalToSave);
 
-      // Start a new interval
       currentIntervalRef.current = {
         start: roundedTime,
         end: roundedTime,
       };
       watchedSecondsRef.current = new Set([roundedTime]);
 
-      // Save the new interval right away
       saveInterval(currentIntervalRef.current);
     }
   };
 
-  // Add a debounced version of saveLocalProgress to reduce frequent localStorage writes
+  // Debounced version to reduce localStorage writes
   const debouncedSaveLocalProgress = (() => {
     let timeoutId = null;
     return (data) => {
@@ -309,33 +256,25 @@ export default function useVideoProgress(userId, videoId) {
           );
           console.log("Saved progress to local storage");
 
-          // Clean up periodically (throttled to not run on every save)
           if (Math.random() < 0.1) {
-            // ~10% chance to run cleanup
             cleanupLocalStorage();
           }
         } catch (err) {
           console.error("Failed to save progress to local storage:", err);
         }
         timeoutId = null;
-      }, 500); // Debounce for 500ms
+      }, 500);
     };
   })();
 
-  /**
-   * Save an interval to the state and prepare for server update
-   * @param {Object} interval - Interval to save
-   */
   const saveInterval = (interval) => {
     if (!interval) return;
 
     console.log("Saving interval to state:", interval);
 
     setWatchedIntervals((prev) => {
-      // Create a deep copy to avoid reference issues
       const newIntervals = prev.map((i) => ({ ...i }));
 
-      // Check if this interval already exists (to avoid duplicates)
       const existingIndex = newIntervals.findIndex(
         (i) => i.start === interval.start && i.end === interval.end
       );
@@ -347,7 +286,6 @@ export default function useVideoProgress(userId, videoId) {
       const merged = mergeIntervals(newIntervals);
       console.log("Merged intervals after save:", merged);
 
-      // Calculate new progress percentage
       let newProgress = 0;
       if (totalDuration > 0) {
         newProgress = calculateProgress(merged, totalDuration);
@@ -356,14 +294,12 @@ export default function useVideoProgress(userId, videoId) {
         );
       }
 
-      // Ensure progress is a valid number
       const validProgress = isNaN(newProgress)
         ? isNaN(progressPercentage)
           ? 0
           : progressPercentage
         : newProgress;
 
-      // Store the current progress for comparison
       const currentProgress = isNaN(progressPercentage)
         ? 0
         : progressPercentage;
@@ -372,7 +308,6 @@ export default function useVideoProgress(userId, videoId) {
         `Comparing progress: current=${currentProgress}, new=${validProgress}`
       );
 
-      // Only update progress if the new value is higher (never decrease progress)
       if (
         validProgress > currentProgress ||
         validProgress > highestProgressRef.current
@@ -387,14 +322,12 @@ export default function useVideoProgress(userId, videoId) {
         console.log(`Keeping current progress at ${currentProgress}%`);
       }
 
-      // Save to local storage with the highest progress
       const finalProgress = Math.max(
         validProgress,
         currentProgress,
         highestProgressRef.current
       );
 
-      // Use debounced version to prevent excessive localStorage writes
       debouncedSaveLocalProgress({
         watchedIntervals: merged,
         progress: finalProgress,
@@ -406,13 +339,8 @@ export default function useVideoProgress(userId, videoId) {
     });
   };
 
-  /**
-   * Send intervals to the server
-   * @param {Number} currentTime - Current time to save as last watched position
-   */
   const syncWithServer = async (currentTime) => {
     try {
-      // Prevent multiple syncs from running simultaneously
       if (isSyncingRef.current) {
         console.log("Sync already in progress, skipping");
         return;
@@ -420,14 +348,12 @@ export default function useVideoProgress(userId, videoId) {
 
       isSyncingRef.current = true;
 
-      // Use currentTime parameter or the latest stored time
       const timeToSave =
         currentTime !== undefined
           ? Math.floor(currentTime)
           : currentTimeRef.current;
       console.log("Syncing with server, current time:", timeToSave);
 
-      // If there's an active interval, save it first
       if (currentIntervalRef.current && watchedSecondsRef.current.size > 0) {
         console.log(
           "Saving active interval before sync:",
@@ -435,19 +361,15 @@ export default function useVideoProgress(userId, videoId) {
         );
         saveInterval({ ...currentIntervalRef.current });
 
-        // When pausing, keep the current interval data until next play
-        // but mark it as inactive by clearing the watched seconds
         watchedSecondsRef.current = new Set();
       }
 
-      // Nothing to update if no intervals and no duration
       if (watchedIntervals.length === 0 && !totalDuration) {
         console.log("No intervals or duration to sync");
         isSyncingRef.current = false;
         return;
       }
 
-      // Store current local intervals and progress
       const currentProgress = isNaN(progressPercentage)
         ? 0
         : progressPercentage;
@@ -458,11 +380,9 @@ export default function useVideoProgress(userId, videoId) {
         totalDuration,
       };
 
-      // Capture current values before async operation
       const syncStartTime = Date.now();
       const currentProgressBeforeSync = currentProgress;
 
-      // Only send the delta (new intervals) since the last sync to reduce payload size
       const newIntervalsToSync = watchedIntervals.filter(
         (interval) =>
           !lastSavedIntervalsRef.current.some(
@@ -475,7 +395,6 @@ export default function useVideoProgress(userId, videoId) {
         `Syncing ${newIntervalsToSync.length} new intervals with server`
       );
 
-      // Update data on the server
       const result = await updateProgress(userId, videoId, {
         newIntervals:
           newIntervalsToSync.length > 0 ? newIntervalsToSync : watchedIntervals,
@@ -485,7 +404,6 @@ export default function useVideoProgress(userId, videoId) {
 
       console.log("Server response:", result);
 
-      // Only update local state if returned progress is higher
       const finalProgress = Math.max(
         result.progress,
         currentProgressBeforeSync,
@@ -495,13 +413,11 @@ export default function useVideoProgress(userId, videoId) {
 
       if (result.progress >= currentProgressBeforeSync) {
         console.log("Using server progress data");
-        // Update state with server response
         setProgressPercentage(finalProgress);
         lastSavedIntervalsRef.current = [...result.watchedIntervals];
         setWatchedIntervals(result.watchedIntervals);
         setLastWatchedTime(result.lastWatchedTime);
 
-        // Update local storage
         debouncedSaveLocalProgress({
           watchedIntervals: result.watchedIntervals,
           progress: finalProgress,
@@ -510,10 +426,8 @@ export default function useVideoProgress(userId, videoId) {
         });
       } else {
         console.log("Server returned lower progress, keeping local progress");
-        // If server progress is lower, update only the progress
         setProgressPercentage(finalProgress);
 
-        // Save our current state to local storage
         debouncedSaveLocalProgress({
           watchedIntervals: localData.watchedIntervals,
           progress: finalProgress,
@@ -521,15 +435,13 @@ export default function useVideoProgress(userId, videoId) {
           totalDuration,
         });
 
-        // Re-sync our higher progress back to server but with a longer delay
-        // and only if there's a significant progress difference
         if (finalProgress - result.progress > 1) {
           setTimeout(() => {
             updateProgress(userId, videoId, {
               newIntervals: localData.watchedIntervals,
               lastWatchedTime: localData.lastWatchedTime,
               totalDuration,
-              forceProgress: finalProgress, // Tell server to use this progress
+              forceProgress: finalProgress,
             }).catch((err) =>
               console.error("Error re-syncing higher progress:", err)
             );
@@ -542,8 +454,6 @@ export default function useVideoProgress(userId, videoId) {
       setError(err.message);
       console.error("Failed to sync progress with server:", err);
 
-      // Even if server sync fails, update local storage
-      // but maintain the current progress percentage
       const currentProgress = isNaN(progressPercentage)
         ? 0
         : progressPercentage;
@@ -558,54 +468,39 @@ export default function useVideoProgress(userId, videoId) {
     }
   };
 
-  /**
-   * Handle video time updates
-   * @param {Number} currentTime - Current video time in seconds
-   */
   const handleTimeUpdate = (currentTime) => {
     if (!currentTime || isNaN(currentTime)) return;
 
-    // Throttle time updates - only process updates every 200ms during normal playback
-    // This reduces the load on the main thread significantly
+    // Throttle time updates to reduce main thread load
     const now = Date.now();
     if (now - (handleTimeUpdate.lastUpdate || 0) < 200) {
       return;
     }
     handleTimeUpdate.lastUpdate = now;
 
-    // Store the current progress before updating
     const beforeUpdateProgress = progressPercentage;
 
-    // Check for seeking - compare with last known time
     const lastKnownTime = currentTimeRef.current;
     const timeDiff = Math.abs(currentTime - lastKnownTime);
 
-    // If a significant seek occurred (more than 2 seconds)
     if (timeDiff > 2 && lastKnownTime > 0) {
       console.log(`Seek detected: ${lastKnownTime} -> ${currentTime}`);
 
-      // Save the current interval if it exists
       if (currentIntervalRef.current) {
         saveInterval({ ...currentIntervalRef.current });
         currentIntervalRef.current = null;
       }
 
-      // Start a new interval at the current position
       startWatchingInterval(currentTime);
     } else {
-      // Normal playback update
       updateWatchingInterval(currentTime);
     }
 
-    // If progress was reset to zero or NaN for some reason, restore it
-    // This is a safeguard against accidental resets, but we'll defer this check
     if (
       (isNaN(progressPercentage) || progressPercentage === 0) &&
       !isNaN(beforeUpdateProgress) &&
       beforeUpdateProgress > 0
     ) {
-      // Use setTimeout with zero delay to defer this operation
-      // This pushes it to the next tick of the event loop
       setTimeout(() => {
         console.log(
           `Progress was reset during update. Restoring ${beforeUpdateProgress}%`
@@ -615,10 +510,6 @@ export default function useVideoProgress(userId, videoId) {
     }
   };
 
-  /**
-   * Handle video duration change
-   * @param {Number} duration - Video duration in seconds
-   */
   const handleDurationChange = (duration) => {
     if (!duration || isNaN(duration)) return;
     const roundedDuration = Math.floor(duration);
@@ -626,76 +517,54 @@ export default function useVideoProgress(userId, videoId) {
     setTotalDuration(roundedDuration);
   };
 
-  /**
-   * Handle video play event
-   * @param {Number} currentTime - Current video time in seconds
-   */
   const handlePlay = (currentTime) => {
     if (!currentTime || isNaN(currentTime)) return;
     console.log("Video started playing at:", currentTime);
 
-    // Ensure we have a valid current time for calculations
     const roundedTime = Math.floor(currentTime);
     currentTimeRef.current = roundedTime;
 
-    // Start a new interval when video plays
     startWatchingInterval(currentTime);
 
-    // Set up periodic updates to the server
     if (updateTimerRef.current) {
       clearInterval(updateTimerRef.current);
     }
 
     updateTimerRef.current = setInterval(() => {
-      // Use the latest time from the ref instead of the captured value
       console.log("Timer update, current time:", currentTimeRef.current);
 
-      // Make sure we don't lose progress during periodic updates
       if (currentIntervalRef.current) {
         saveInterval({ ...currentIntervalRef.current });
       }
 
-      // Use requestIdleCallback if available to run sync during browser idle time
       if (typeof window !== "undefined" && "requestIdleCallback" in window) {
         window.requestIdleCallback(
           () => syncWithServer(currentTimeRef.current),
           { timeout: 2000 }
         );
       } else {
-        // Fallback for browsers that don't support requestIdleCallback
         setTimeout(() => syncWithServer(currentTimeRef.current), 0);
       }
-    }, 10000); // Increased to 10 seconds to reduce frequency
+    }, 10000);
   };
 
-  /**
-   * Handle video pause event
-   * @param {Number} currentTime - Current video time in seconds
-   */
   const handlePause = (currentTime) => {
     if (!currentTime || isNaN(currentTime)) return;
     console.log("Video paused at:", currentTime);
 
-    // Ensure we have a valid current time for calculations
     currentTimeRef.current = Math.floor(currentTime);
 
-    // First save current interval if it exists
     if (currentIntervalRef.current) {
       saveInterval({ ...currentIntervalRef.current });
     }
 
-    // Store the current progress percentage before syncing
     const currentProgressValue = progressPercentage;
     console.log("Storing current progress before pause:", currentProgressValue);
 
-    // Sync with server when video is paused
     syncWithServer(currentTime);
 
-    // Ensure progress doesn't reset after sync by explicitly setting it back
-    // This is a safeguard in case syncWithServer resets the value
     setTimeout(() => {
       console.log("Restoring progress after pause:", currentProgressValue);
-      // Only restore if higher than current (to prevent overriding a better value)
       if (!isNaN(currentProgressValue) && currentProgressValue > 0) {
         const currentProgressAfterSync = progressPercentage;
         if (
@@ -707,7 +576,6 @@ export default function useVideoProgress(userId, videoId) {
       }
     }, 100);
 
-    // Clear the update timer
     if (updateTimerRef.current) {
       clearInterval(updateTimerRef.current);
       updateTimerRef.current = null;

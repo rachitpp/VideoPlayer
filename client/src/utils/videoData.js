@@ -1,4 +1,4 @@
-// Video data for the application
+// Sample videos for testing the player
 export const videos = [
   {
     id: "video1",
@@ -33,7 +33,7 @@ export const videos = [
   },
 ];
 
-// Helper function to find a video by ID
+// Helper to find a video by ID
 export const getVideoById = (videoId) => {
   return videos.find((video) => video.id === videoId) || null;
 };
